@@ -1,0 +1,307 @@
+/* Navbar Header */
+.navbar-header {
+  display: flex;
+  align-items: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 70px;
+  z-index: 1000;
+  padding: 0 16px;
+  box-sizing: border-box;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+.hamburger-btn {
+  background: white;
+  border: 1px solid #f0f0f0;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0; /* Prevent shrinking */
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+  transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+  margin-left: 6px;
+}
+
+.hamburger-btn:focus,
+.hamburger-btn:active {
+  outline: none;
+  background: white !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+}
+
+.hamburger-btn .material-icons {
+  font-size: 24px;
+  color: #333;
+}
+
+.hamburger-btn:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transform: scale(1.05);
+}
+
+/* Search Bar Styles */
+.search-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 0 4px;
+  background: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: #fff !important;
+  border-radius: 16px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  flex: 1;
+  margin: 0 12px;
+  border: 1px solid #eee;
+  height: 44px;
+}
+
+.search-bar input {
+  width: 100%;
+  height: 100%;
+  padding: 12px 18px 12px 48px;
+  border: none;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  background: transparent;
+  outline: none;
+}
+
+.search-icon {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 22px;
+  color: #888;
+  pointer-events: none;
+}
+
+.cart-btn {
+    background: white;
+    border: 1px solid #f0f0f0;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    color: #333;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+    margin-right: 6px;
+}
+
+.cart-btn:focus, .cart-btn:active {
+    outline: none; /* Remove focus outline */
+    background: white !important; /* Ensure background stays white */
+    box-shadow: 0 1px 4px rgba(0,0,0,0.07); /* Keep shadow consistent */
+}
+
+.cart-btn:hover {
+  /* No hover effect */
+}
+
+.cart-btn .material-icons {
+    font-size: 24px;
+}
+
+.cart-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: #ff4d5a;
+    color: #fff;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid white;
+}
+
+/* Sidebar */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -300px;
+  width: 300px;
+  height: 100%;
+  background: white;
+  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+  z-index: 1002;
+  transition: left 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: flex-start; /* Aligns button to the left */
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.close-btn {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  cursor: pointer;
+  color: #555;
+  padding: 0;
+}
+
+.close-btn:hover, .close-btn:focus {
+  /* No hover effect as requested */
+  background: white;
+  border-color: #e0e0e0;
+  outline: none;
+}
+
+.close-btn:focus-visible {
+  outline: none;
+}
+
+/* Profile Section */
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+.profile-icon {
+  font-size: 80px;
+  color: #ccc;
+}
+
+.welcome-text {
+  margin-top: 10px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+  margin-top: auto; /* Pushes footer to the bottom */
+  padding: 20px;
+}
+
+.logout-action {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  border: none;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.logout-action:hover {
+  background-color: #ffcdd2;
+}
+
+/* Overlay */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+  z-index: 1001;
+}
+
+@media (min-width: 768px) {
+  /* On desktop, the hamburger button is still visible in this design */
+  .search-container {
+    /* No padding needed here anymore */
+  }
+}
+
+@media (max-width: 600px) {
+  .navbar-header {
+    padding: 0 6px;
+    height: 56px;
+    margin-top: 12px;
+  }
+  .hamburger-btn,
+  .cart-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .search-container {
+    width: 100%;
+    max-width: 100vw;
+    padding: 0 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .search-bar {
+    width: 90vw;
+    max-width: 260px;
+    min-width: 0;
+    margin: 8px 0 !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: flex;
+    align-items: center;
+  }
+  .search-bar input {
+    font-size: 0.95rem;
+    padding: 8px 10px 8px 36px;
+  }
+}
+
+body, #root {
+  background: none !important;
+} 

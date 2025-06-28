@@ -1,0 +1,120 @@
+.delivery-login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fff7ed 0%, #fef9c3 100%) !important;
+  padding: 20px;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(255,77,90,0.10), 0 2px 8px rgba(255,179,71,0.08);
+  padding: 40px 32px 32px 32px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  border: 3px solid transparent;
+  background-clip: padding-box, border-box;
+  background-origin: padding-box, border-box;
+  background-image: linear-gradient(#fff, #fff), linear-gradient(90deg, #ff4d5a 0%, #ffb347 100%);
+}
+
+.login-title {
+  color: #ff4d5a;
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+.login-subtitle {
+  color: #b36a4a;
+  font-size: 1.08rem;
+  margin-bottom: 32px;
+}
+
+.error-message {
+  background: #fff0f3;
+  color: #ff4d5a;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.input-group {
+  margin-bottom: 22px;
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  color: #ff4d5a;
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 14px 20px;
+  border: 2.5px solid #ffb347;
+  border-radius: 999px;
+  font-size: 1.08rem;
+  transition: border-color 0.3s, box-shadow 0.2s;
+  box-sizing: border-box;
+  background: #fff7ed;
+  color: #222;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #ff4d5a;
+  box-shadow: 0 0 0 3px rgba(255,77,90,0.10);
+  background: #fff;
+}
+
+.login-button {
+  width: 100%;
+  background: linear-gradient(90deg, #ff4d5a 0%, #ffb347 100%);
+  color: #fff;
+  border: none;
+  padding: 15px 0;
+  border-radius: 999px;
+  font-size: 1.13rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+  margin-top: 8px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(255,77,90,0.10);
+  outline: none;
+}
+
+.login-button:hover:not(:disabled) {
+  background: linear-gradient(90deg, #ffb347 0%, #ff4d5a 100%);
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 4px 18px rgba(255,77,90,0.13);
+}
+
+.login-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 30px 12px;
+    margin: 10px;
+  }
+  .login-title {
+    font-size: 1.3rem;
+  }
+  .login-subtitle {
+    font-size: 1rem;
+  }
+} 

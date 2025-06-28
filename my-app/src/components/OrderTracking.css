@@ -1,0 +1,502 @@
+/* New Styles for Order History Section */
+
+.past-orders-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 25px;
+  margin-top: 30px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 700px;
+  box-sizing: border-box;
+}
+
+.past-orders-card h2 {
+  text-align: center;
+  font-size: 24px;
+  color: #333;
+  margin-top: 0;
+  margin-bottom: 25px;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.past-order-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+  cursor: pointer;
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.past-order-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+}
+
+.past-order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.past-order-info strong {
+  font-size: 18px;
+  color: #343a40;
+}
+
+.past-order-info span {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.past-order-details {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  text-align: right;
+}
+
+.past-order-details > span:first-child {
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+  min-width: 60px;
+}
+
+.status-tag {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  color: #fff;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+}
+
+/* Color coding for different statuses */
+.status-tag.status-delivered { background-color: #28a745; }
+.status-tag.status-out-for-delivery,
+.status-tag.status-out_for_delivery { background-color: #ffc107; color: #333; }
+.status-tag.status-pending { background-color: #17a2b8; }
+.status-tag.status-confirmed { background-color: #007bff; }
+.status-tag.status-cancelled { background-color: #dc3545; }
+.status-tag.status-ready { background-color: #fd7e14; }
+
+/* Food Background Animation Styles */
+.food-bg-animate {
+    position: relative;
+    overflow: hidden;
+    min-height: 100vh;
+    width: 100vw;
+    background: linear-gradient(135deg, #fff7ed 0%, #fef9c3 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Floating food SVGs */
+.food-float {
+    position: fixed;
+    pointer-events: none;
+    opacity: 0.6;
+    z-index: 1;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.food-float-1 { top: 8%; left: 6%; animation-delay: 0s; animation: food-float-move 7s ease-in-out infinite; }
+.food-float-2 { bottom: 10%; right: 8%; animation-delay: 2s; animation: food-float-drift 9s ease-in-out infinite; }
+.food-float-3 { top: 18%; right: 12%; animation-delay: 4s; animation: food-float-spin 12s linear infinite; }
+.food-float-4 { top: 60%; left: 8%; animation-delay: 1.5s; z-index: 1; animation: food-float-drift 8s ease-in-out infinite; }
+.food-float-5 { top: 20%; right: 10%; animation-delay: 3.2s; z-index: 1; animation: food-float-move 10s ease-in-out infinite; }
+.food-float-6 { bottom: 12%; left: 50%; animation-delay: 4.5s; z-index: 1; animation: food-float-spin 14s linear infinite; }
+.food-float-7 { top: 10%; left: 30%; animation-delay: 1.2s; z-index: 1; animation: food-float-drift 11s ease-in-out infinite; }
+.food-float-8 { top: 70%; right: 12%; animation-delay: 2.7s; z-index: 1; animation: food-float-move 8s ease-in-out infinite; }
+.food-float-9 { bottom: 18%; left: 18%; animation-delay: 3.8s; z-index: 1; animation: food-float-drift 13s ease-in-out infinite; }
+.food-float-10 { top: 40%; right: 20%; animation-delay: 0.9s; z-index: 1; animation: food-float-spin 10s linear infinite; }
+.food-float-11 { bottom: 30%; right: 8%; animation-delay: 2.2s; z-index: 1; animation: food-float-move 9s ease-in-out infinite; }
+.food-float-12 { top: 55%; left: 60%; animation-delay: 4.1s; z-index: 1; animation: food-float-drift 12s ease-in-out infinite; }
+.food-float-13 { top: 80%; left: 40%; animation-delay: 5.3s; z-index: 1; animation: food-float-spin 15s linear infinite; }
+.food-float-14 { top: 25%; right: 30%; animation-delay: 1.7s; z-index: 1; animation: food-float-move 11s ease-in-out infinite; }
+.food-float-15 { bottom: 8%; right: 18%; animation-delay: 3.1s; z-index: 1; animation: food-float-drift 10s ease-in-out infinite; }
+.food-float-16 { top: 15%; left: 50%; animation-delay: 2.5s; z-index: 1; animation: food-float-spin 13s linear infinite; }
+.food-float-17 { bottom: 25%; right: 20%; animation-delay: 1.9s; z-index: 1; animation: food-float-move 12s ease-in-out infinite; }
+.food-float-18 { top: 35%; left: 20%; animation-delay: 3.7s; z-index: 1; animation: food-float-drift 9s ease-in-out infinite; }
+.food-float-19 { top: 45%; left: 70%; animation-delay: 2.8s; z-index: 1; animation: food-float-spin 11s linear infinite; }
+.food-float-20 { bottom: 35%; left: 25%; animation-delay: 4.3s; z-index: 1; animation: food-float-move 13s ease-in-out infinite; }
+
+@keyframes food-float-move {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-18px) scale(1.08); }
+}
+
+@keyframes food-float-drift {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(10px); }
+    100% { transform: translateX(0); }
+}
+
+@keyframes food-float-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.order-tracking-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 8px 32px 8px;
+  background: linear-gradient(135deg, #fff7ed 0%, #fef9c3 100%);
+  min-height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.tracking-card {
+  background: transparent;
+  padding: 36px 28px 32px 28px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  position: relative;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  transition: none;
+  z-index: 10;
+}
+
+.back-button {
+  position: absolute;
+  top: 18px;
+  left: 24px;
+  background: rgba(255, 77, 90, 0.12);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  color: #ff4d5a;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.18s, color 0.18s;
+  box-shadow: 0 2px 8px rgba(255,77,90,0.08);
+}
+
+.back-button:hover, .back-button:focus {
+  background: rgba(255, 77, 90, 0.22);
+  color: #d73748;
+}
+
+h1 {
+  text-align: center;
+  color: #ff4d5a;
+  margin-top: 0;
+  margin-bottom: 18px;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  font-family: 'Baloo 2', 'Fredoka', 'Poppins', 'Segoe UI', Arial, sans-serif;
+}
+
+.tracking-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.order-id-input {
+  padding: 13px 14px;
+  border: 1.5px solid #ffb347;
+  border-radius: 9px;
+  font-size: 1.08rem;
+  background: #fff7ed;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+  text-align: left;
+  margin-top: 0;
+  margin-bottom: 0;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.order-id-input:focus {
+  border-color: #ff4d5a;
+  box-shadow: 0 0 0 3px rgba(255,77,90,0.10);
+  background: #fff;
+}
+
+.track-button {
+  width: 100%;
+  background: linear-gradient(90deg, #ff4d5a 0%, #ffb347 100%);
+  color: #fff;
+  border: none;
+  padding: 13px 0;
+  border-radius: 9px;
+  font-size: 1.13rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 6px;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 8px rgba(255,77,90,0.10);
+  transition: background 0.2s, box-shadow 0.2s;
+  letter-spacing: 0.5px;
+  outline: none;
+}
+
+.track-button:hover {
+  background: linear-gradient(90deg, #ffb347 0%, #ff4d5a 100%);
+  box-shadow: 0 4px 18px rgba(255,77,90,0.13);
+}
+
+.error-message {
+  background: #fff0f3;
+  color: #ff4d5a;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.order-status-container {
+  margin-top: 18px;
+  background: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 18px;
+}
+
+.status-timeline {
+  margin-bottom: 10px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #ffeaea;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ffb347 0%, #ff4d5a 100%);
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(.68,-0.55,.27,1.55);
+}
+
+.current-status-text {
+  font-size: 1.08rem;
+  color: #b36a4a;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+h2 {
+  color: #ff4d5a;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  margin-top: 0;
+  text-align: center;
+}
+
+.status-tag {
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding: 6px 18px;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(90deg, #ffb347 0%, #ff4d5a 100%);
+  box-shadow: 0 1px 4px rgba(255,77,90,0.08);
+  border: none;
+  margin-left: 8px;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+  display: inline-block;
+}
+
+/* Latest Orders Section */
+.latest-orders-title {
+  color: #ff4d5a;
+  font-size: 1.18rem;
+  font-weight: 800;
+  margin: 18px 0 10px 0;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.latest-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.latest-order-item {
+  background: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 12px 0 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.08rem;
+  font-weight: 600;
+  color: #b36a4a;
+  transition: none;
+}
+
+.latest-order-item:hover,
+.latest-order-item:focus,
+.latest-order-item:active {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: inherit !important;
+}
+
+.latest-order-id {
+  color: #ff4d5a;
+  font-weight: 700;
+  margin-right: 10px;
+}
+
+.latest-order-status {
+  margin-left: 10px;
+}
+
+.other-orders-title {
+  color: #b36a4a;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 10px 0 6px 0;
+  text-align: center;
+}
+
+.order-dropdown {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #ffb347;
+  background: #fffdfa;
+  font-size: 1.05rem;
+  color: #b36a4a;
+  margin-bottom: 10px;
+  margin-top: 0;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.order-dropdown:focus {
+  border-color: #ff4d5a;
+  box-shadow: 0 0 0 2px #ffeaea;
+}
+
+.order-dropdown option {
+  color: #333 !important;
+  background: #fff !important;
+}
+
+@media (max-width: 600px) {
+  .tracking-card {
+    max-width: 98vw;
+    padding: 18px 4vw 16px 4vw;
+  }
+  .order-tracking-container {
+    padding: 12px 0 24px 0;
+  }
+}
+
+/* Order List Styles */
+.orders-list-view {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.order-list-item:hover {
+  background-color: #f9f9f9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.order-item-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-item-summary strong {
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.order-item-date {
+  font-size: 0.9rem;
+  color: #777;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 12px;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Order Details Styles */
+.order-details-view {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+.map-container, .delivery-info-placeholder {
+  margin-top: 25px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.delivery-info-placeholder {
+    padding: 20px;
+    background-color: #f8f9fa;
+    text-align: center;
+    color: #6c757d;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
