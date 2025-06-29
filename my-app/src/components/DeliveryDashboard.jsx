@@ -162,7 +162,7 @@ const DeliveryDashboard = () => {
                             })
                             .eq('id', order.id);
                         // Trigger reassignment via backend
-                        fetch('http://localhost:4000/api/reassign-delivery-boy', {
+                        fetch('https://chickfilla.onrender.com/api/reassign-delivery-boy', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ orderId: order.id })
@@ -221,7 +221,7 @@ const DeliveryDashboard = () => {
         setShowPopup(false);
         setPendingOrder(null);
         // 2. Trigger reassignment via backend
-        fetch('http://localhost:4000/api/reassign-delivery-boy', {
+        fetch('https://chickfilla.onrender.com/api/reassign-delivery-boy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ orderId: pendingOrder.id })

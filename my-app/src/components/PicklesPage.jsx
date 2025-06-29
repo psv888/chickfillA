@@ -135,7 +135,7 @@ export default function PicklesPage() {
       
       const amount = cartItems.reduce((sum, item) => sum + item.dish.price * item.quantity, 0);
       
-      const orderResponse = await fetch('http://localhost:4000/api/create-order', {
+      const orderResponse = await fetch('https://chickfilla.onrender.com/api/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
