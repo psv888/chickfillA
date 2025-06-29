@@ -135,57 +135,43 @@ export default function PicklesPage() {
       
       const amount = cartItems.reduce((sum, item) => sum + item.dish.price * item.quantity, 0);
       
-      const options = {
-        amount: amount * 100, // in paise
-        handler: async function (response) {
-          // On payment success, insert order and order items
-          const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .insert([{
-              name: orderDetails.name,
-              phone: orderDetails.phone,
-              address: orderDetails.address,
-              total_price: cartTotal,
-              user_id: currentUser?.id || null,
-            }])
-            .select()
-            .single();
-          if (orderError) {
-            alert('Order failed: ' + orderError.message);
-            return;
-          }
-          const orderItems = cartItems.map(item => ({
-            order_id: order.id,
-            dish_id: item.dish.id,
-            quantity: item.quantity,
-            price_at_order: item.dish.price,
-          }));
-          const { error: itemsError } = await supabase
-            .from('order_items')
-            .insert(orderItems);
-          if (itemsError) {
-            alert('Order items failed: ' + itemsError.message);
-            return;
-          }
-          setPopupOrderId(order.id); // Use the auto-incremented order id
-          setPopupUsername(orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@")[0] : "Guest"));
-          setShowOrderAnimation(true); // Show delivery animation
-          setOrderCount(prev => prev + 1);
-          clearCart();
-          setTimeout(() => setShowOrderPopup('anim'), 2000); // After delivery animation, show order confirmed anim
-        },
-        prefill: {
+      const orderResponse = await fetch('http://localhost:4000/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: orderDetails.name,
-          email: '',
-          contact: orderDetails.phone
-        },
-        notes: {
-          address: orderDetails.address
-        }
-      };
-      
-      const rzp = createRazorpayOrder(options);
-      rzp.open();
+          phone: orderDetails.phone,
+          address: orderDetails.address,
+          total_price: cartTotal,
+          user_id: currentUser?.id || null,
+          restaurant_id: cartPickleVendor?.id,
+        })
+      });
+      const result = await orderResponse.json();
+      if (result.error) {
+        alert('Order failed: ' + result.error);
+        return;
+      }
+      const order = result.order;
+      const orderItems = cartItems.map(item => ({
+        order_id: order.id,
+        dish_id: item.dish.id,
+        quantity: item.quantity,
+        price_at_order: item.dish.price,
+      }));
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItems);
+      if (itemsError) {
+        alert('Order items failed: ' + itemsError.message);
+        return;
+      }
+      setPopupOrderId(order.id); // Use the auto-incremented order id
+      setPopupUsername(orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@")[0] : "Guest"));
+      setShowOrderAnimation(true); // Show delivery animation
+      setOrderCount(prev => prev + 1);
+      clearCart();
+      setTimeout(() => setShowOrderPopup('anim'), 2000); // After delivery animation, show order confirmed anim
     } catch (error) {
       console.error('Payment initialization error:', error);
       alert('Payment initialization failed. Please try again or contact support.');

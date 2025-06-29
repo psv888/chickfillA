@@ -1,6 +1,6 @@
-require('dotenv').config();
+const assignDeliveryBoyToOrder = require('./assignDeliveryBoy');
 const { createClient } = require('@supabase/supabase-js');
-const fetch = require('node-fetch');
+require('dotenv').config();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -26,54 +26,28 @@ function getDistanceKm(lat1, lon1, lat2, lon2) {
 }
 
 async function reassignDeliveryBoy(orderId) {
-  // 1. Fetch order
-  const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
-  if (!order) return;
-
-  let declinedIds = [];
   try {
-    declinedIds = JSON.parse(order.declined_delivery_person_ids || '[]');
-  } catch { declinedIds = []; }
-  const restaurantId = order.restaurant_id;
-  if (!restaurantId) return;
+    console.log('reassignDeliveryBoy called with orderId:', orderId);
+    // 1. Fetch order
+    const { data: order, error: orderError } = await supabase.from('orders').select('*').eq('id', orderId).single();
+    if (orderError) console.log('Order fetch error:', orderError);
+    if (!order) { console.log('No order found for id', orderId); return; }
 
-  // 2. Get restaurant zipcode
-  const { data: restaurant } = await supabase.from('admin_items').select('zipcode').eq('id', restaurantId).single();
-  if (!restaurant || !restaurant.zipcode) return;
-  const restLatLng = await getLatLngFromZip(restaurant.zipcode);
+    let declinedIds = [];
+    try {
+      declinedIds = JSON.parse(order.declined_delivery_person_ids || '[]');
+    } catch (e) { 
+      console.log('Error parsing declined_delivery_person_ids:', e);
+      declinedIds = []; 
+    }
+    const restaurantId = order.restaurant_id;
+    if (!restaurantId) { console.log('No restaurant_id in order'); return; }
 
-  // 3. Get online delivery boys, excluding declined
-  const { data: deliveryBoys } = await supabase
-    .from('delivery_personnel')
-    .select('id, full_name, zipcode')
-    .eq('is_online', true);
-
-  const filteredBoys = deliveryBoys.filter(boy => !declinedIds.includes(boy.id));
-  const boysWithDistance = [];
-  for (const boy of filteredBoys) {
-    if (!boy.zipcode) continue;
-    const boyLatLng = await getLatLngFromZip(boy.zipcode);
-    if (!boyLatLng) continue;
-    const distance = getDistanceKm(restLatLng.lat, restLatLng.lon, boyLatLng.lat, boyLatLng.lon);
-    boysWithDistance.push({ ...boy, distance });
-  }
-  boysWithDistance.sort((a, b) => a.distance - b.distance);
-  const assignedBoy = boysWithDistance[0];
-
-  // 4. Assign order with pending acceptance and update declined_delivery_person_ids
-  if (assignedBoy) {
-    await supabase
-      .from('orders')
-      .update({
-        delivery_person_id: assignedBoy.id,
-        assignment_status: 'pending_acceptance',
-        declined_delivery_person_ids: JSON.stringify(declinedIds)
-      })
-      .eq('id', orderId);
-    return assignedBoy;
-  } else {
-    // No available delivery boy
-    return null;
+    // Use the shared assignment logic
+    return await assignDeliveryBoyToOrder(order, restaurantId, declinedIds);
+  } catch (err) {
+    console.error('reassignDeliveryBoy error:', err);
+    throw err;
   }
 }
 

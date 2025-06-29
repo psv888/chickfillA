@@ -2,8 +2,10 @@
   "dependencies": {
     "@lottiefiles/react-lottie-player": "^3.6.0",
     "@supabase/supabase-js": "^2.50.2",
+    "cors": "^2.8.5",
     "dotenv": "^17.0.0",
     "express": "^5.1.0",
+    "node-cron": "^4.1.1",
     "node-fetch": "^3.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

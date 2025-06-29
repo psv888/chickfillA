@@ -124,21 +124,24 @@ export default function BiryaniPage() {
         amount: amount * 100,
         handler: async function (response) {
           // On payment success, insert order and order items
-          const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .insert([{
+          const orderResponse = await fetch('http://localhost:4000/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               name: orderDetails.name,
               phone: orderDetails.phone,
               address: orderDetails.address,
               total_price: cartTotal,
               user_id: currentUser?.id || null,
-            }])
-            .select()
-            .single();
-          if (orderError) {
-            alert('Order failed: ' + orderError.message);
+              restaurant_id: cartBiryaniPoint?.id,
+            })
+          });
+          const result = await orderResponse.json();
+          if (result.error) {
+            alert('Order failed: ' + result.error);
             return;
           }
+          const order = result.order;
           const orderItems = cartItems.map(item => ({
             order_id: order.id,
             dish_id: item.dish.id,

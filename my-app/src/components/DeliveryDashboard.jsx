@@ -30,7 +30,11 @@ const DeliveryDashboard = () => {
 
     const fetchAssignedOrders = useCallback(async (personId) => {
         const { data, error: fetchError } = await supabase
-            .from('orders').select('*').eq('delivery_person_id', personId).order('created_at', { ascending: false });
+            .from('orders')
+            .select('*')
+            .eq('delivery_person_id', personId)
+            .eq('assignment_status', 'accepted')
+            .order('created_at', { ascending: false });
         if (fetchError) {
             setError('Could not fetch assigned orders.');
         } else {
@@ -139,8 +143,36 @@ const DeliveryDashboard = () => {
             console.log('Pending orders found:', pendingOrders);
             
             if (pendingOrders && pendingOrders.length > 0) {
-                console.log('Setting pending order:', pendingOrders[0]);
-                setPendingOrder(pendingOrders[0]);
+                const order = pendingOrders[0];
+                if (order.assignment_time) {
+                    const assignedAt = new Date(order.assignment_time);
+                    const now = new Date();
+                    if ((now - assignedAt) > 30000) { // 30 seconds
+                        // Auto-decline and reassign
+                        let declinedIds = [];
+                        try {
+                            declinedIds = JSON.parse(order.declined_delivery_person_ids || '[]');
+                        } catch { declinedIds = []; }
+                        if (!declinedIds.includes(deliveryPerson.id)) declinedIds.push(deliveryPerson.id);
+                        await supabase
+                            .from('orders')
+                            .update({ 
+                                assignment_status: 'declined',
+                                declined_delivery_person_ids: JSON.stringify(declinedIds)
+                            })
+                            .eq('id', order.id);
+                        // Trigger reassignment via backend
+                        fetch('http://localhost:4000/api/reassign-delivery-boy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ orderId: order.id })
+                        });
+                        setShowPopup(false);
+                        setPendingOrder(null);
+                        return;
+                    }
+                }
+                setPendingOrder(order);
                 setShowPopup(true);
             } else {
                 setShowPopup(false);
@@ -149,6 +181,17 @@ const DeliveryDashboard = () => {
         }, 3000);
         return () => clearInterval(interval);
     }, [user, deliveryPerson]);
+
+    // 30-second auto-decline timer for pending order popup
+    useEffect(() => {
+        if (showPopup && pendingOrder) {
+            const timer = setTimeout(() => {
+                // Auto-decline and reassign if not accepted/declined in 30 seconds
+                handleDecline();
+            }, 30000); // 30 seconds
+            return () => clearTimeout(timer);
+        }
+    }, [showPopup, pendingOrder]);
 
     const handleAccept = async () => {
         if (!pendingOrder) return;
@@ -178,7 +221,7 @@ const DeliveryDashboard = () => {
         setShowPopup(false);
         setPendingOrder(null);
         // 2. Trigger reassignment via backend
-        fetch('/api/reassign-delivery-boy', {
+        fetch('http://localhost:4000/api/reassign-delivery-boy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ orderId: pendingOrder.id })
