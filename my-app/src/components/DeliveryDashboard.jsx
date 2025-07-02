@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { useLocationTracking } from '../contexts/LocationTrackingContext';
 import './DeliveryDashboard.css';
 
 const DeliveryDashboard = () => {
@@ -12,8 +13,18 @@ const DeliveryDashboard = () => {
     const [onlineStatusLoading, setOnlineStatusLoading] = useState(false);
     const [pendingOrder, setPendingOrder] = useState(null);
     const [showPopup, setShowPopup] = useState(false);
+    const [trackingIntervalId, setTrackingIntervalId] = useState(null);
     const navigate = useNavigate();
-    // useRef to keep a stable reference to watchIds across re-renders
+    
+    // Live tracking context
+    const { 
+        isTracking, 
+        startTracking, 
+        stopTracking, 
+        addOrderToTracking, 
+        removeOrderFromTracking 
+    } = useLocationTracking();
+
     const watchIds = useRef({});
 
     // Fetching logic can be kept in useCallback as it's used by the initialization effect
@@ -61,51 +72,48 @@ const DeliveryDashboard = () => {
         initialize();
     }, [navigate, fetchDeliveryPersonData, fetchAssignedOrders]);
 
-    // This is the main tracking effect. It runs ONLY when the `orders` array changes.
+    // Start live tracking when delivery person is loaded
     useEffect(() => {
-        // Helper function to stop tracking for a specific order
+        if (deliveryPerson?.id && !isTracking) {
+            startTracking(deliveryPerson.id);
+        }
+    }, [deliveryPerson?.id, isTracking, startTracking]);
+
+    // Effect for real-time tracking based on orders
+    useEffect(() => {
+        const watchIds = {};
         const stopTracking = (orderId) => {
-            const watchId = watchIds.current[orderId];
-            if (watchId) {
-                navigator.geolocation.clearWatch(watchId);
-                // Remove the id from our ref object
-                delete watchIds.current[orderId];
-                console.log(`[Order #${orderId}] Stopped tracking.`);
+            if (watchIds[orderId]) {
+                navigator.geolocation.clearWatch(watchIds[orderId]);
+                delete watchIds[orderId];
             }
         };
-
-        // Helper function to start tracking for a specific order
         const startTracking = (orderId) => {
             if (!navigator.geolocation) return;
-            // If already tracking, do nothing
-            if (watchIds.current[orderId]) return;
-
-            console.log(`[Order #${orderId}] Starting tracking...`);
-            const watchId = navigator.geolocation.watchPosition(
+            if (watchIds[orderId]) return;
+            watchIds[orderId] = navigator.geolocation.watchPosition(
                 async (position) => {
                     const { latitude, longitude } = position.coords;
-                    const location = `POINT(${longitude} ${latitude})`;
-                    
-                    const { error: dbError } = await supabase
-                        .from('orders').update({ delivery_person_location: location }).eq('id', orderId);
-                    
-                    if (dbError) {
-                        console.error(`[Order #${orderId}] Error updating location:`, dbError);
-                    } else {
-                        console.log(`[Order #${orderId}] Location updated successfully.`);
-                    }
+                    const geojson = JSON.stringify({
+                        type: 'Point',
+                        coordinates: [longitude, latitude]
+                    });
+                    const orderIdNum = Number(orderId);
+                    console.log('Calling update_order_location with:', {
+                      order_id: orderIdNum,
+                      geojson
+                    });
+                    await supabase.rpc('update_order_location', {
+                        order_id: orderIdNum,
+                        geojson
+                    });
                 },
                 (geoError) => {
-                    console.error(`[Order #${orderId}] Geolocation error:`, geoError);
-                    stopTracking(orderId); // Stop on error
+                    stopTracking(orderId);
                 },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
             );
-            // Store the new watchId in our ref
-            watchIds.current[orderId] = watchId;
         };
-
-        // Loop through the current orders and decide whether to start or stop tracking
         orders.forEach(order => {
             if (order.status === 'out_for_delivery') {
                 startTracking(order.id);
@@ -113,16 +121,23 @@ const DeliveryDashboard = () => {
                 stopTracking(order.id);
             }
         });
-
-        // The main cleanup function for this effect
         return () => {
-            console.log("Cleaning up all active location watchers.");
-            Object.values(watchIds.current).forEach(watchId => {
+            Object.values(watchIds).forEach(watchId => {
                 navigator.geolocation.clearWatch(watchId);
             });
-            watchIds.current = {};
         };
-    }, [orders]); // The effect depends ONLY on the orders state
+    }, [orders]);
+
+    // Manage tracking orders when orders change
+    useEffect(() => {
+        orders.forEach(order => {
+            if (order.status === 'out_for_delivery') {
+                addOrderToTracking(order);
+            } else {
+                removeOrderFromTracking(order.id);
+            }
+        });
+    }, [orders, addOrderToTracking, removeOrderFromTracking]);
 
     // Poll for pending assignments
     useEffect(() => {
@@ -234,14 +249,15 @@ const DeliveryDashboard = () => {
         if (updateError) {
             alert('Error updating status: ' + updateError.message);
         } else {
-            // This state update will cause the tracking `useEffect` above to re-run
             setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         }
     };
 
     const handleLogout = async () => {
+        // Stop live tracking before logout
+        stopTracking();
         await supabase.auth.signOut();
-        navigate('/delivery-login'); // The useEffect cleanup will handle stopping trackers
+        navigate('/delivery-login');
     };
 
     const handleToggleOnlineStatus = async () => {
@@ -256,6 +272,43 @@ const DeliveryDashboard = () => {
             setDeliveryPerson(prev => ({ ...prev, is_online: newStatus }));
         }
         setOnlineStatusLoading(false);
+    };
+
+    const handleStartDelivery = async (orderId) => {
+        if (!navigator.geolocation) {
+            alert('Geolocation is not supported by your browser');
+            return;
+        }
+        // Initial location update
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+            await supabase
+                .from('orders')
+                .update({
+                    status: 'out_for_delivery',
+                    delivery_person_location: {
+                        type: 'Point',
+                        coordinates: [longitude, latitude]
+                    }
+                })
+                .eq('id', orderId);
+            // Start interval for real-time updates
+            const intervalId = setInterval(() => {
+                navigator.geolocation.getCurrentPosition(async (pos) => {
+                    const { latitude, longitude } = pos.coords;
+                    await supabase
+                        .from('orders')
+                        .update({
+                            delivery_person_location: {
+                                type: 'Point',
+                                coordinates: [longitude, latitude]
+                            }
+                        })
+                        .eq('id', orderId);
+                });
+            }, 5000); // every 5 seconds
+            setTrackingIntervalId(intervalId);
+        });
     };
 
     if (loading) return <div className="dashboard-loading">Loading Dashboard...</div>;
@@ -293,6 +346,19 @@ const DeliveryDashboard = () => {
                             : deliveryPerson?.is_online ? 'Go Offline' : 'Go Online'}
                     </button>
                 </div>
+                {isTracking && (
+                    <div style={{ 
+                        marginTop: 8, 
+                        padding: '8px 12px', 
+                        background: 'rgba(76, 175, 80, 0.1)', 
+                        borderRadius: 6, 
+                        border: '1px solid rgba(76, 175, 80, 0.3)',
+                        fontSize: '14px',
+                        color: '#2e7d32'
+                    }}>
+                        📍 Live location tracking is active
+                    </div>
+                )}
             </header>
             <main className="dashboard-content">
                 <h2>Your Assigned Orders</h2>

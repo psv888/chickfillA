@@ -9,23 +9,41 @@ require('dotenv').config();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+// Helper function to add delay between requests
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 async function getLatLngFromZip(zipcode, country = 'India') {
   const url = `https://nominatim.openstreetmap.org/search?postalcode=${zipcode}&country=${country}&format=json&limit=1`;
-  const res = await fetch(url);
-  const text = await res.text();
-  console.log('Geocode API response for zipcode', zipcode, ':', text);
-  if (text.trim().startsWith('<')) {
-    console.error('Geocode API returned HTML, likely rate-limited or error page.');
-    return null;
-  }
+  
   try {
-    const data = JSON.parse(text);
-    if (data && data.length > 0) {
-      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'ChickfillA-Delivery-App/1.0',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    
+    const text = await res.text();
+    console.log('Geocode API response for zipcode', zipcode, ':', text.substring(0, 200) + '...');
+    
+    if (text.trim().startsWith('<')) {
+      console.error('Geocode API returned HTML, likely rate-limited or error page.');
+      return null;
     }
-    return null;
-  } catch (e) {
-    console.error('Failed to parse geocode response:', text);
+    
+    try {
+      const data = JSON.parse(text);
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+      }
+      return null;
+    } catch (e) {
+      console.error('Failed to parse geocode response:', text.substring(0, 200));
+      return null;
+    }
+  } catch (error) {
+    console.error('Geocoding request failed:', error.message);
     return null;
   }
 }
@@ -77,6 +95,8 @@ async function assignDeliveryBoyToOrder(order, restaurantId, declinedIds = []) {
         if (!boyLatLng) continue;
         const distance = getDistanceKm(restLatLng.lat, restLatLng.lon, boyLatLng.lat, boyLatLng.lon);
         boysWithDistance.push({ ...boy, distance });
+        // Add delay between requests to avoid rate limiting
+        await delay(1000); // 1 second delay
       }
       console.log('Boys with distance:', boysWithDistance);
       // 4. Sort by distance and pick the closest

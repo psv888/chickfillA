@@ -5,7 +5,7 @@ import './OrderTracking.css';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Select from 'react-select';
 import { components } from 'react-select';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
@@ -36,6 +36,7 @@ const OrderTracking = () => {
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const location = useLocation();
 
   // Fetch current user on mount
   useEffect(() => {
@@ -78,6 +79,37 @@ const OrderTracking = () => {
       ).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [order?.id]);
+
+  useEffect(() => {
+    // Check for orderId in location.state or query param
+    let idFromState = location.state && location.state.orderId;
+    let idFromQuery = null;
+    if (!idFromState && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      idFromQuery = params.get('orderId');
+    }
+    const idToUse = idFromState || idFromQuery;
+    if (idToUse) {
+      setOrderId(idToUse.toString());
+      setSelectedOrderId(idToUse);
+      setLoading(true);
+      setError('');
+      supabase
+        .rpc('get_order_with_geojson_location', { order_id_param: idToUse })
+        .single()
+        .then(({ data, error: fetchError }) => {
+          if (fetchError || !data) {
+            setError('Order not found. Please check the ID and try again.');
+            setOrder(null);
+            setSelectedOrderId(null);
+          } else {
+            setOrder(data);
+            setSelectedOrderId(data.id);
+          }
+          setLoading(false);
+        });
+    }
+  }, [location.state]);
 
   const handleTrackOrder = async (e) => {
     e.preventDefault();

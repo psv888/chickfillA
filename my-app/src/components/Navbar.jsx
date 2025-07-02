@@ -95,22 +95,25 @@ const Navbar = ({ searchQuery, onSearchChange }) => {
       const options = {
         amount: amount * 100, // in paise
         handler: async function (response) {
-          // On payment success, insert order and order items
-          const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .insert([{
+          // On payment success, create order via backend API
+          const orderResponse = await fetch('https://chickfilla.onrender.com/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               name: orderDetails.name,
               phone: orderDetails.phone,
               address: orderDetails.address,
               total_price: cartTotal,
               user_id: user?.id || null,
-            }])
-            .select()
-            .single();
-          if (orderError) {
-            alert('Order failed: ' + orderError.message);
+              restaurant_id: cartItems[0]?.dish?.parent_id || null, // Get restaurant from first item
+            })
+          });
+          const result = await orderResponse.json();
+          if (result.error) {
+            alert('Order failed: ' + result.error);
             return;
           }
+          const order = result.order;
           const orderItems = cartItems.map(item => ({
             order_id: order.id,
             dish_id: item.dish.id,

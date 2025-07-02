@@ -1,0 +1,124 @@
+.live-tracking-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 1000;
+  min-width: 280px;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.tracking-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tracking-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  font-size: 20px;
+}
+
+.pulse-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: #ff4757;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+.tracking-info {
+  flex: 1;
+}
+
+.tracking-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.tracking-details {
+  font-size: 12px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
+.location-coords {
+  display: block;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+/* Responsive design */
+@media (max-width: 480px) {
+  .live-tracking-indicator {
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+  }
+  
+  .tracking-content {
+    gap: 8px;
+  }
+  
+  .tracking-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+  
+  .tracking-title {
+    font-size: 13px;
+  }
+  
+  .tracking-details {
+    font-size: 11px;
+  }
+} 

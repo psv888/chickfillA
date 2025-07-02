@@ -12,6 +12,8 @@ import { loadRazorpayScript, createRazorpayOrder } from '../utils/razorpay';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { getUserLocation, getLatLngFromZip, getDistanceKm } from '../utils/locationFiltering';
+import { useNavigate } from 'react-router-dom';
 
 if (L && L.Icon && L.Icon.Default) {
   delete L.Icon.Default.prototype._getIconUrl;
@@ -22,111 +24,7 @@ if (L && L.Icon && L.Icon.Default) {
   });
 }
 
-// Helper: Get lat/lng from zipcode using Nominatim
-async function getLatLngFromZip(zipcode, country = 'India') {
-  // Try India first, fallback to US if not found
-  let url = `https://nominatim.openstreetmap.org/search?postalcode=${zipcode}&country=${country}&format=json&limit=1`;
-  let res = await fetch(url);
-  let data = await res.json();
-  if (data && data.length > 0) {
-    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-  }
-  // Fallback to US if India fails
-  if (country === 'India') {
-    url = `https://nominatim.openstreetmap.org/search?postalcode=${zipcode}&country=United States&format=json&limit=1`;
-    res = await fetch(url);
-    data = await res.json();
-    if (data && data.length > 0) {
-      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-    }
-  }
-  return null;
-}
 
-// Helper: Haversine distance in km
-function getDistanceKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2-lat1) * Math.PI/180;
-  const dLon = (lon2-lon1) * Math.PI/180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
-
-// Assignment logic
-async function assignDeliveryBoyToOrder(order, restaurantId, declinedIds = []) {
-  console.log('Starting assignment for order:', order.id, 'restaurant:', restaurantId);
-  
-  // 1. Get restaurant zipcode
-  const { data: restaurant } = await supabase
-    .from('admin_items')
-    .select('zipcode')
-    .eq('id', restaurantId)
-    .single();
-  console.log('Restaurant data:', restaurant);
-  
-  if (!restaurant || !restaurant.zipcode) {
-    console.log('No restaurant or zipcode found');
-    return;
-  }
-  
-  const restLatLng = await getLatLngFromZip(restaurant.zipcode);
-  console.log('Restaurant lat/lng:', restLatLng);
-  
-  // 2. Get online delivery boys, excluding declined
-  const { data: deliveryBoys } = await supabase
-    .from('delivery_personnel')
-    .select('id, full_name, zipcode')
-    .eq('is_online', true);
-  console.log('Online delivery boys:', deliveryBoys);
-  
-  const filteredBoys = deliveryBoys.filter(boy => !declinedIds.includes(boy.id));
-  console.log('Filtered delivery boys (excluding declined):', filteredBoys);
-  
-  // 3. Get lat/lng for each delivery boy and calculate distance
-  const boysWithDistance = [];
-  for (const boy of filteredBoys) {
-    if (!boy.zipcode) continue;
-    const boyLatLng = await getLatLngFromZip(boy.zipcode);
-    if (!boyLatLng) continue;
-    const distance = getDistanceKm(restLatLng.lat, restLatLng.lon, boyLatLng.lat, boyLatLng.lon);
-    boysWithDistance.push({ ...boy, distance });
-  }
-  console.log('Boys with distance:', boysWithDistance);
-  
-  // 4. Sort by distance and pick the closest
-  boysWithDistance.sort((a, b) => a.distance - b.distance);
-  const assignedBoy = boysWithDistance[0];
-  console.log('Closest delivery boy:', assignedBoy);
-  
-  // 5. Assign order with pending acceptance and update declined_delivery_person_ids
-  if (assignedBoy) {
-    console.log('Assigning order to delivery boy:', assignedBoy.id, typeof assignedBoy.id);
-    const { data, error } = await supabase
-      .from('orders')
-      .update({ 
-        delivery_person_id: assignedBoy.id,
-        assignment_status: 'pending_acceptance',
-        declined_delivery_person_ids: JSON.stringify(declinedIds)
-      })
-      .eq('id', order.id)
-      .select();
-    console.log('Order update result:', data, 'Error:', error);
-    
-    if (error) {
-      console.error('Error assigning order:', error);
-      return null;
-    }
-    
-    console.log('Order assigned successfully');
-    return assignedBoy;
-  } else {
-    console.log('No available delivery boy found');
-    return null;
-  }
-}
 
 export default function RestaurantsPage() {
   const [restaurants, setRestaurants] = useState([]);
@@ -142,6 +40,8 @@ export default function RestaurantsPage() {
   const [orderId, setOrderId] = useState('');
   const [currentUser, setCurrentUser] = useState(null);
   const [showCartBar, setShowCartBar] = useState(false);
+  const [userZipcode, setUserZipcode] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(true);
   
   // New state for payment success flow
   const [showOrderAnimation, setShowOrderAnimation] = useState(false);
@@ -154,6 +54,11 @@ export default function RestaurantsPage() {
   const [orderTrackingOrder, setOrderTrackingOrder] = useState(null);
   const [orderTrackingLoading, setOrderTrackingLoading] = useState(false);
   const [orderTrackingError, setOrderTrackingError] = useState('');
+
+  // Define username for use in order placement
+  const username = orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@")[0] : "Guest");
+
+  const navigate = useNavigate();
 
   ReactModal.setAppElement('#root');
 
@@ -172,15 +77,45 @@ export default function RestaurantsPage() {
     }
   };
 
+  // Get user location and filter restaurants
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('admin_items')
-        .select('*')
-        .eq('section', 'restaurants');
-      setRestaurants(data || []);
-      setLoading(false);
+      setLocationLoading(true);
+      try {
+        // Get user's zipcode
+        const userZip = await getUserLocation();
+        setUserZipcode(userZip);
+        // Get all restaurants
+        const { data: allRestaurants, error } = await supabase
+          .from('admin_items')
+          .select('*')
+          .eq('section', 'restaurants');
+        if (error) {
+          setRestaurants(allRestaurants || []);
+          return;
+        }
+        // Geocode user zipcode only
+        const userLatLng = await getLatLngFromZip(userZip);
+        if (!userLatLng) {
+          setRestaurants(allRestaurants || []);
+          return;
+        }
+        // Filter by location using stored lat/lng
+        const filteredRestaurants = (allRestaurants || []).filter(r => {
+          if (r.latitude == null || r.longitude == null) return false;
+          const dist = getDistanceKm(userLatLng.lat, userLatLng.lon, r.latitude, r.longitude);
+          r.distance = dist;
+          return dist <= 10;
+        });
+        filteredRestaurants.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        setRestaurants(filteredRestaurants);
+      } catch (error) {
+        setRestaurants([]);
+      } finally {
+        setLoading(false);
+        setLocationLoading(false);
+      }
     };
     fetchData();
   }, []);
@@ -223,33 +158,31 @@ export default function RestaurantsPage() {
   // Add Razorpay payment handler - FIXED VERSION
   async function handleRazorpayPayment(e) {
     e.preventDefault();
-    
     try {
       await loadRazorpayScript();
-      
       const amount = cartItems.reduce((sum, item) => sum + item.dish.price * item.quantity, 0);
-      const username = orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@")[0] : "Guest");
-      
+      const username = orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@") [0] : "Guest");
       const options = {
         amount: amount * 100,
         handler: async function (response) {
-          // On payment success, insert order and order items
-          const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .insert([{
+          const orderResponse = await fetch('https://chickfilla.onrender.com/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               name: orderDetails.name,
               phone: orderDetails.phone,
               address: orderDetails.address,
               total_price: cartTotal,
-              restaurant_id: cartRestaurant.id,
               user_id: currentUser?.id || null,
-            }])
-            .select()
-            .single();
-          if (orderError) {
-            alert('Order failed: ' + orderError.message);
+              restaurant_id: cartRestaurant?.id,
+            })
+          });
+          const result = await orderResponse.json();
+          if (result.error) {
+            alert('Order failed: ' + result.error);
             return;
           }
+          const order = result.order;
           const orderItems = cartItems.map(item => ({
             order_id: order.id,
             dish_id: item.dish.id,
@@ -263,24 +196,9 @@ export default function RestaurantsPage() {
             alert('Order items failed: ' + itemsError.message);
             return;
           }
-          
-          // Assign delivery boy automatically
-          let assignmentSuccess = false;
-          if (cartRestaurant && cartRestaurant.id) {
-            console.log('Attempting to assign delivery boy for order:', order.id, 'restaurant:', cartRestaurant.id);
-            const assignedBoy = await assignDeliveryBoyToOrder(order, cartRestaurant.id);
-            console.log('Assignment result:', assignedBoy);
-            assignmentSuccess = !!assignedBoy;
-          } else {
-            console.log('No cartRestaurant or cartRestaurant.id found:', cartRestaurant);
-          }
-          
-          setPopupOrderId(order.id); // Use the auto-incremented order id
-          setPopupUsername(username);
-          setShowOrderAnimation(true); // Show delivery animation
-          setOrderCount(prev => prev + 1);
           clearCart();
-          setTimeout(() => setShowOrderPopup('anim'), 2000); // After delivery animation, show order confirmed anim
+          setOrderCount(prev => prev + 1);
+          navigate('/order-tracking', { state: { orderId: order.id } });
         },
         prefill: {
           name: orderDetails.name,
@@ -291,7 +209,6 @@ export default function RestaurantsPage() {
           address: orderDetails.address
         }
       };
-      
       const rzp = createRazorpayOrder(options);
       rzp.open();
     } catch (error) {
@@ -611,13 +528,61 @@ export default function RestaurantsPage() {
             />
           </div>
         ) : (
-          <div className="category-cards-grid">
-            {restaurants
-              .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
-              .map((r, idx) => (
-                <RestaurantCard key={idx} restaurant={r} onCardClick={() => openMenuModal(r)} />
-              ))}
-          </div>
+          <>
+            {/* Location indicator */}
+            {userZipcode && (
+              <div style={{ 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                color: 'white', 
+                padding: '12px 16px', 
+                borderRadius: '12px', 
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px'
+              }}>
+                <span>📍</span>
+                <span>Showing restaurants near your location (Zip: {userZipcode})</span>
+                {restaurants.length > 0 && (
+                  <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
+                    {restaurants.length} restaurant{restaurants.length > 1 ? 's' : ''} found
+                  </span>
+                )}
+              </div>
+            )}
+            
+            {/* No restaurants found message */}
+            {restaurants.length === 0 && !loading && (
+              <div style={{ 
+                textAlign: 'center', 
+                padding: '40px 20px',
+                color: '#666'
+              }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🍕</div>
+                <h3 style={{ marginBottom: '8px', color: '#333' }}>No restaurants found nearby</h3>
+                <p style={{ marginBottom: '16px' }}>
+                  We couldn't find any restaurants within 50km of your location.
+                </p>
+                {userZipcode && (
+                  <p style={{ fontSize: '14px', color: '#888' }}>
+                    Your zipcode: {userZipcode}
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Restaurants grid */}
+            {restaurants.length > 0 && (
+              <div className="category-cards-grid">
+                {restaurants
+                  .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+                  .map((r, idx) => (
+                    <RestaurantCard key={idx} restaurant={r} onCardClick={() => openMenuModal(r)} />
+                  ))}
+              </div>
+            )}
+          </>
         )}
       </div>
       <ReactModal

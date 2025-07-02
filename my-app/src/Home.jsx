@@ -6,6 +6,8 @@ import './Home.css';
 import Navbar from './components/Navbar';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import './components/LoginSuccessAnimation.css';
+import { getUserLocation, getLatLngFromZip, getDistanceKm } from './utils/locationFiltering';
+import RestaurantCard from './components/RestaurantCard';
 
 const sections = [
     { key: 'restaurants', label: 'Restaurants', icon: '🍽️' },
@@ -57,17 +59,51 @@ const Home = () => {
     const [selectedItem, setSelectedItem] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const navigate = useNavigate();
+    const [userZipcode, setUserZipcode] = useState(null);
 
     useEffect(() => {
         const fetchItems = async () => {
+            // Get user's zipcode
+            const userZip = await getUserLocation();
+            setUserZipcode(userZip);
             const { data, error } = await supabase
                 .from('admin_items')
                 .select('*');
             if (error) return;
             const grouped = { restaurants: [], biryani: [], pickles: [], tiffins: [], 'fresh-meat': [] };
-            data.forEach(item => {
-                if (grouped[item.section]) grouped[item.section].push(item);
-            });
+            if (!userZip) {
+                // No user zipcode, show all
+                data.forEach(item => {
+                    if (grouped[item.section]) grouped[item.section].push(item);
+                });
+                setItems(grouped);
+                return;
+            }
+            // Geocode user zipcode only
+            const userLatLng = await getLatLngFromZip(userZip);
+            if (!userLatLng) {
+                // Could not geocode user, show all
+                data.forEach(item => {
+                    if (grouped[item.section]) grouped[item.section].push(item);
+                });
+                setItems(grouped);
+                return;
+            }
+            // Filter each section by distance using stored lat/lng
+            for (const section of Object.keys(grouped)) {
+                const sectionItems = data.filter(item => item.section === section);
+                grouped[section] = sectionItems.filter(item => {
+                    if (item.latitude == null || item.longitude == null) {
+                        // If no lat/lng, skip
+                        return false;
+                    }
+                    const dist = getDistanceKm(userLatLng.lat, userLatLng.lon, item.latitude, item.longitude);
+                    item.distance = dist;
+                    return dist <= 10;
+                });
+                // Sort by distance
+                grouped[section].sort((a, b) => (a.distance || 0) - (b.distance || 0));
+            }
             setItems(grouped);
         };
         fetchItems();
@@ -125,6 +161,7 @@ const Home = () => {
                         width: `calc(100% * ${carouselImages.length})`,
                         transform: `translateX(-${current * 100}%)`,
                         transition: 'transform 0.7s cubic-bezier(.68,-0.55,.27,1.55)'
+                        
                     }}>
                         {carouselImages.filter(Boolean).map((img, idx) => (
                             <img
@@ -172,45 +209,21 @@ const Home = () => {
                     <div key={s.key} className="home-section">
                         <div className="section-header">
                             <h3>{s.label}</h3>
-                            <button className="view-all-btn">View All</button>
+                            <button className="view-all-btn" onClick={() => navigate(`/${s.key}`)}>View All</button>
                         </div>
-                        <div className="home-section-items">
+                        <div className="category-cards-grid">
                             {items[s.key].length === 0 && (
                                 <div className="no-items-message">
                                     <span className="no-items-icon">🍽️</span>
-                                    <span>No items available yet.</span>
+                                    <span>No {s.label.toLowerCase()} found near you.</span>
                                 </div>
                             )}
                             {items[s.key].map((item, idx) => (
-                                <div
-                                    className="category-card-preview"
-                                    onClick={() => handleItemClick(item, s.key)}
-                                    tabIndex={0}
-                                    role="button"
-                                    aria-label={`View ${item.name}`}
-                                    onKeyDown={e => { if (e.key === 'Enter') handleItemClick(item, s.key); }}
-                                >
-                                    <div style={{position:'relative', width:'100%'}}>
-                                        <img className="category-card-img-top" src={item.photo_url} alt={item.name} />
-                                        <div className="category-card-img-overlay">
-                                            <div className="category-card-img-overlay-content">
-                                                <div className="category-card-img-overlay-top">
-                                                    <div className="category-card-delivery">
-                                                        <span style={{fontSize: '1.1em', color: '#3ec16c'}}>⏱️</span>
-                                                        <span>30-35 min</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="category-card-info">
-                                        <div className="category-card-title-row">
-                                            <div className="category-card-title">{item.name}</div>
-                                            <div className="category-card-rating-badge">4.2★</div>
-                                        </div>
-                                        <div className="category-card-description">{item.location}</div>
-                                    </div>
-                                </div>
+                                <RestaurantCard
+                                    key={item.id || idx}
+                                    restaurant={item}
+                                    onCardClick={() => handleItemClick(item, s.key)}
+                                />
                             ))}
                         </div>
                     </div>

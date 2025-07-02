@@ -12,6 +12,8 @@ import { loadRazorpayScript, createRazorpayOrder } from '../utils/razorpay';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { getUserLocation, getLatLngFromZip, getDistanceKm } from '../utils/locationFiltering';
+import { useNavigate } from 'react-router-dom';
 
 // Fix Leaflet icon issue
 if (typeof window !== 'undefined' && L && L.Icon && L.Icon.Default) {
@@ -47,6 +49,9 @@ export default function BiryaniPage() {
   const [orderTrackingOrder, setOrderTrackingOrder] = useState(null);
   const [orderTrackingLoading, setOrderTrackingLoading] = useState(false);
   const [orderTrackingError, setOrderTrackingError] = useState('');
+  const [userZipcode, setUserZipcode] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const navigate = useNavigate();
 
   ReactModal.setAppElement('#root');
 
@@ -62,15 +67,45 @@ export default function BiryaniPage() {
     }
   };
 
+  // Get user location and filter biryani points
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('admin_items')
-        .select('*')
-        .eq('section', 'biryani');
-      setBiryani(data || []);
-      setLoading(false);
+      setLocationLoading(true);
+      try {
+        // Get user's zipcode
+        const userZip = await getUserLocation();
+        setUserZipcode(userZip);
+        // Get all biryani points
+        const { data: allBiryani, error } = await supabase
+          .from('admin_items')
+          .select('*')
+          .eq('section', 'biryani');
+        if (error) {
+          setBiryani(allBiryani || []);
+          return;
+        }
+        // Geocode user zipcode only
+        const userLatLng = await getLatLngFromZip(userZip);
+        if (!userLatLng) {
+          setBiryani(allBiryani || []);
+          return;
+        }
+        // Filter by location using stored lat/lng
+        const filteredBiryani = (allBiryani || []).filter(r => {
+          if (r.latitude == null || r.longitude == null) return false;
+          const dist = getDistanceKm(userLatLng.lat, userLatLng.lon, r.latitude, r.longitude);
+          r.distance = dist;
+          return dist <= 10;
+        });
+        filteredBiryani.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        setBiryani(filteredBiryani);
+      } catch (error) {
+        setBiryani([]);
+      } finally {
+        setLoading(false);
+        setLocationLoading(false);
+      }
     };
     fetchData();
   }, []);
@@ -113,18 +148,14 @@ export default function BiryaniPage() {
   // Add Razorpay payment handler
   async function handleRazorpayPayment(e) {
     e.preventDefault();
-    
     try {
       await loadRazorpayScript();
-      
       const amount = cartItems.reduce((sum, item) => sum + item.dish.price * item.quantity, 0);
       const username = orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@")[0] : "Guest");
-      
       const options = {
         amount: amount * 100,
         handler: async function (response) {
-          // On payment success, insert order and order items
-          const orderResponse = await fetch('http://localhost:4000/api/create-order', {
+          const orderResponse = await fetch('https://chickfilla.onrender.com/api/create-order', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -155,12 +186,9 @@ export default function BiryaniPage() {
             alert('Order items failed: ' + itemsError.message);
             return;
           }
-          setPopupOrderId(order.id); // Use the auto-incremented order id
-          setPopupUsername(username);
-          setShowOrderAnimation(true); // Show delivery animation
-          setOrderCount(prev => prev + 1);
           clearCart();
-          setTimeout(() => setShowOrderPopup('anim'), 2000); // After delivery animation, show order confirmed anim
+          setOrderCount(prev => prev + 1);
+          navigate('/order-tracking', { state: { orderId: order.id } });
         },
         prefill: {
           name: orderDetails.name,
@@ -171,7 +199,6 @@ export default function BiryaniPage() {
           address: orderDetails.address
         }
       };
-      
       const rzp = createRazorpayOrder(options);
       rzp.open();
     } catch (error) {
@@ -529,13 +556,61 @@ export default function BiryaniPage() {
             />
           </div>
       ) : (
-        <div className="category-cards-grid">
-          {biryani
-            .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
-            .map((r, idx) => (
-                <RestaurantCard key={idx} restaurant={r} onCardClick={() => openMenuModal(r)} />
-            ))}
-        </div>
+        <>
+          {/* Location indicator */}
+          {userZipcode && (
+            <div style={{ 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+              color: 'white', 
+              padding: '12px 16px', 
+              borderRadius: '12px', 
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '14px'
+            }}>
+              <span>🍛</span>
+              <span>Showing biryani points near your location (Zip: {userZipcode})</span>
+              {biryani.length > 0 && (
+                <span style={{ marginLeft: 'auto', fontSize: '12px', opacity: 0.9 }}>
+                  {biryani.length} biryani point{biryani.length > 1 ? 's' : ''} found
+                </span>
+              )}
+            </div>
+          )}
+          
+          {/* No biryani points found message */}
+          {biryani.length === 0 && !loading && (
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px 20px',
+              color: '#666'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🍛</div>
+              <h3 style={{ marginBottom: '8px', color: '#333' }}>No biryani points found nearby</h3>
+              <p style={{ marginBottom: '16px' }}>
+                We couldn't find any biryani points within your area.
+              </p>
+              {userZipcode && (
+                <p style={{ fontSize: '14px', color: '#888' }}>
+                  Your zipcode: {userZipcode}
+                </p>
+              )}
+            </div>
+          )}
+          
+          {/* Biryani points grid */}
+          {biryani.length > 0 && (
+            <div className="category-cards-grid">
+              {biryani
+                .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+                .map((r, idx) => (
+                  <RestaurantCard key={idx} restaurant={r} onCardClick={() => openMenuModal(r)} />
+                ))}
+            </div>
+          )}
+        </>
       )}
       </div>
       <ReactModal

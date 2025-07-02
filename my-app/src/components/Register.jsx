@@ -1,18 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import './Register.css';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+
+// Helper: Get zipcode from location using Nominatim
+async function getZipcodeFromLocation(location) {
+    if (!location) return '';
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&addressdetails=1&limit=1`;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data && data.length > 0 && data[0].address && data[0].address.postcode) {
+            return data[0].address.postcode;
+        }
+    } catch (e) {
+        // ignore
+    }
+    return '';
+}
+
+// Helper: Get location suggestions from Nominatim
+async function getLocationSuggestions(query) {
+    if (!query) return [];
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`;
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+        return data;
+    } catch (e) {
+        return [];
+    }
+}
 
 const Register = () => {
     const [formData, setFormData] = useState({
         email: '',
         password: '',
         name: '',
-        phone: ''
+        phone: '',
+        zipcode: ''
     });
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const [location, setLocation] = useState('');
+    const [locationSuggestions, setLocationSuggestions] = useState([]);
+    const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+    const locationInputRef = useRef();
+    let locationDebounceTimeout = useRef();
+    const [autoZipLoading, setAutoZipLoading] = useState(false);
+    const [autoZipError, setAutoZipError] = useState('');
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -25,6 +62,13 @@ const Register = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+
+        // Validate zipcode
+        if (!formData.zipcode || !/^[0-9]{5,6}$/.test(formData.zipcode)) {
+            setError('Please enter a valid 5-6 digit zipcode.');
+            return;
+        }
+
         // Register with Supabase Auth
         const { data, error } = await supabase.auth.signUp({
             email: formData.email,
@@ -42,6 +86,7 @@ const Register = () => {
                     email: formData.email,
                     name: formData.name,
                     phone: formData.phone,
+                    zipcode: formData.zipcode,
                 }
             ]);
             if (profileError) {
@@ -52,6 +97,41 @@ const Register = () => {
         } else {
             setError('Registration failed.');
         }
+    };
+
+    // Handler for location input change (with debounce)
+    const handleLocationInputChange = async (e) => {
+        const value = e.target.value;
+        setLocation(value);
+        setShowLocationDropdown(true);
+        if (locationDebounceTimeout.current) clearTimeout(locationDebounceTimeout.current);
+        locationDebounceTimeout.current = setTimeout(async () => {
+            if (value.length < 2) {
+                setLocationSuggestions([]);
+                return;
+            }
+            const suggestions = await getLocationSuggestions(value);
+            setLocationSuggestions(suggestions);
+        }, 300);
+    };
+
+    // Handler for suggestion click
+    const handleLocationSuggestionClick = (suggestion) => {
+        setLocation(suggestion.display_name);
+        setShowLocationDropdown(false);
+        setLocationSuggestions([]);
+        // Auto-fill zipcode if available
+        if (suggestion.address && suggestion.address.postcode) {
+            setFormData(prevState => ({
+                ...prevState,
+                zipcode: suggestion.address.postcode
+            }));
+        }
+    };
+
+    // Handler for blur (hide dropdown after a short delay)
+    const handleLocationBlur = () => {
+        setTimeout(() => setShowLocationDropdown(false), 200);
     };
 
     return (
@@ -103,6 +183,66 @@ const Register = () => {
                         required
                         placeholder="Enter your phone number"
                     />
+                </div>
+                <div className="register-form-group left-align" ref={locationInputRef} style={{ position: 'relative' }}>
+                    <label htmlFor="location">Location</label>
+                    <input
+                        type="text"
+                        id="location"
+                        name="location"
+                        className="register-input"
+                        value={location}
+                        onChange={handleLocationInputChange}
+                        onBlur={handleLocationBlur}
+                        placeholder="Enter your city, state, country or street address"
+                        required
+                        autoComplete="off"
+                        onFocus={() => location && setShowLocationDropdown(true)}
+                    />
+                    {showLocationDropdown && locationSuggestions.length > 0 && (
+                        <ul className="location-suggestions-dropdown" style={{
+                            position: 'absolute',
+                            zIndex: 10,
+                            background: '#fff',
+                            border: '1px solid #eee',
+                            width: '100%',
+                            maxHeight: 180,
+                            overflowY: 'auto',
+                            listStyle: 'none',
+                            margin: 0,
+                            padding: 0,
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                        }}>
+                            {locationSuggestions.map((s, idx) => (
+                                <li
+                                    key={s.place_id}
+                                    style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f3f3f3' }}
+                                    onMouseDown={() => handleLocationSuggestionClick(s)}
+                                >
+                                    {s.display_name}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {autoZipLoading && <div style={{ color: '#1a73e8', fontSize: '0.95rem', marginTop: 2 }}>Detecting zipcode...</div>}
+                    {autoZipError && <div style={{ color: '#d73748', fontSize: '0.95rem', marginTop: 2 }}>{autoZipError}</div>}
+                </div>
+                <div className="register-form-group left-align">
+                    <label htmlFor="zipcode">Zip Code</label>
+                    <input
+                        type="text"
+                        id="zipcode"
+                        name="zipcode"
+                        value={formData.zipcode}
+                        onChange={handleChange}
+                        required
+                        placeholder="Enter your zip code"
+                        maxLength="6"
+                        pattern="[0-9]{5,6}"
+                    />
+                    <small style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                        We'll show you restaurants and food available in your area
+                    </small>
                 </div>
                 <div className="register-form-group left-align">
                     <label htmlFor="password">Password</label>

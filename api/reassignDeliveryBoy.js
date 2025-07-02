@@ -6,12 +6,25 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 async function getLatLngFromZip(zipcode, country = 'India') {
   const url = `https://nominatim.openstreetmap.org/search?postalcode=${zipcode}&country=${country}&format=json&limit=1`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data && data.length > 0) {
-    return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+  
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'ChickfillA-Delivery-App/1.0',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
+    });
+    
+    const data = await res.json();
+    if (data && data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+    return null;
+  } catch (error) {
+    console.error('Geocoding request failed:', error.message);
+    return null;
   }
-  return null;
 }
 
 function getDistanceKm(lat1, lon1, lat2, lon2) {

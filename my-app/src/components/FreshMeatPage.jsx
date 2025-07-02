@@ -12,6 +12,8 @@ import { loadRazorpayScript, createRazorpayOrder } from '../utils/razorpay';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { getUserLocation, getLatLngFromZip, getDistanceKm } from '../utils/locationFiltering';
+import { useNavigate } from 'react-router-dom';
 
 if (L && L.Icon && L.Icon.Default) {
   delete L.Icon.Default.prototype._getIconUrl;
@@ -49,6 +51,11 @@ export default function FreshMeatPage() {
   const [orderTrackingOrder, setOrderTrackingOrder] = useState(null);
   const [orderTrackingLoading, setOrderTrackingLoading] = useState(false);
   const [orderTrackingError, setOrderTrackingError] = useState('');
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [userZipcode, setUserZipcode] = useState('');
+  const [meat, setMeat] = useState([]);
+
+  const navigate = useNavigate();
 
   ReactModal.setAppElement('#root');
 
@@ -70,12 +77,41 @@ export default function FreshMeatPage() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('admin_items')
-        .select('*')
-        .eq('section', 'fresh-meat');
-      setFreshMeat(data || []);
-      setLoading(false);
+      setLocationLoading(true);
+      try {
+        // Get user's zipcode
+        const userZip = await getUserLocation();
+        setUserZipcode(userZip);
+        // Get all fresh meat vendors
+        const { data: allMeat, error } = await supabase
+          .from('admin_items')
+          .select('*')
+          .eq('section', 'freshmeat');
+        if (error) {
+          setMeat(allMeat || []);
+          return;
+        }
+        // Geocode user zipcode only
+        const userLatLng = await getLatLngFromZip(userZip);
+        if (!userLatLng) {
+          setMeat(allMeat || []);
+          return;
+        }
+        // Filter by location using stored lat/lng
+        const filteredMeat = (allMeat || []).filter(r => {
+          if (r.latitude == null || r.longitude == null) return false;
+          const dist = getDistanceKm(userLatLng.lat, userLatLng.lon, r.latitude, r.longitude);
+          r.distance = dist;
+          return dist <= 10;
+        });
+        filteredMeat.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        setMeat(filteredMeat);
+      } catch (error) {
+        setMeat([]);
+      } finally {
+        setLoading(false);
+        setLocationLoading(false);
+      }
     };
     fetchData();
   }, []);
@@ -97,7 +133,7 @@ export default function FreshMeatPage() {
   const cartItems = Object.values(cart);
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const cartTotal = cartItems.reduce((sum, item) => sum + item.dish.price * item.quantity, 0);
-  const cartMeatShop = freshMeat.find(m => m.id === cartItems[0]?.dish.parent_id);
+  const cartMeatShop = meat.find(m => m.id === cartItems[0]?.dish.parent_id);
 
   // Show cart bar when an item is added
   useEffect(() => {
@@ -120,49 +156,61 @@ export default function FreshMeatPage() {
   }, []);
 
   // Add Razorpay payment handler
-  async function handleRazorpayPayment() {
+  async function handleRazorpayPayment(e) {
+    e.preventDefault();
     try {
       await loadRazorpayScript();
-      
       const amount = cartItems.reduce((sum, item) => sum + item.dish.price * item.quantity, 0);
-      
-      const orderResponse = await fetch('https://chickfilla.onrender.com/api/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const username = orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@") [0] : "Guest");
+      const options = {
+        amount: amount * 100,
+        handler: async function (response) {
+          const orderResponse = await fetch('https://chickfilla.onrender.com/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: orderDetails.name,
+              phone: orderDetails.phone,
+              address: orderDetails.address,
+              total_price: cartTotal,
+              user_id: currentUser?.id || null,
+              restaurant_id: cartMeatShop?.id,
+            })
+          });
+          const result = await orderResponse.json();
+          if (result.error) {
+            alert('Order failed: ' + result.error);
+            return;
+          }
+          const order = result.order;
+          const orderItems = cartItems.map(item => ({
+            order_id: order.id,
+            dish_id: item.dish.id,
+            quantity: item.quantity,
+            price_at_order: item.dish.price,
+          }));
+          const { error: itemsError } = await supabase
+            .from('order_items')
+            .insert(orderItems);
+          if (itemsError) {
+            alert('Order items failed: ' + itemsError.message);
+            return;
+          }
+          clearCart();
+          setOrderCount(prev => prev + 1);
+          navigate('/order-tracking', { state: { orderId: order.id } });
+        },
+        prefill: {
           name: orderDetails.name,
-          phone: orderDetails.phone,
-          address: orderDetails.address,
-          total_price: cartTotal,
-          user_id: currentUser?.id || null,
-          restaurant_id: cartMeatShop?.id,
-        })
-      });
-      const result = await orderResponse.json();
-      if (result.error) {
-        alert('Order failed: ' + result.error);
-        return;
-      }
-      const order = result.order;
-      const orderItems = cartItems.map(item => ({
-        order_id: order.id,
-        dish_id: item.dish.id,
-        quantity: item.quantity,
-        price_at_order: item.dish.price,
-      }));
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems);
-      if (itemsError) {
-        alert('Order items failed: ' + itemsError.message);
-        return;
-      }
-      setPopupOrderId(order.id); // Use the auto-incremented order id
-      setPopupUsername(orderDetails.name || (currentUser && currentUser.email ? currentUser.email.split("@")[0] : "Guest"));
-      setShowOrderAnimation(true); // Show delivery animation
-      setOrderCount(prev => prev + 1);
-      clearCart();
-      setTimeout(() => setShowOrderPopup('anim'), 2000); // After delivery animation, show order confirmed anim
+          email: '',
+          contact: orderDetails.phone
+        },
+        notes: {
+          address: orderDetails.address
+        }
+      };
+      const rzp = createRazorpayOrder(options);
+      rzp.open();
     } catch (error) {
       console.error('Payment initialization error:', error);
       alert('Payment initialization failed. Please try again or contact support.');
@@ -451,7 +499,7 @@ export default function FreshMeatPage() {
           </div>
         ) : (
           <div className="category-cards-grid">
-            {freshMeat
+            {meat
               .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
               .map((r, idx) => (
                 <RestaurantCard key={idx} restaurant={r} onCardClick={() => openMenuModal(r)} />
@@ -582,7 +630,7 @@ export default function FreshMeatPage() {
           )
         )}
         {checkoutStep === 'form' && !showOrderPopup && (
-          <form onSubmit={e => { e.preventDefault(); handleRazorpayPayment(); }} style={{ padding: '20px 0' }}>
+          <form onSubmit={handleRazorpayPayment} style={{ padding: '20px 0' }}>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Name:</label>
               <input

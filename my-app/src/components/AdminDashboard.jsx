@@ -13,6 +13,45 @@ const sections = [
 
 const BUCKET = 'admin-photos';
 
+// Helper: Get zipcode from location using Nominatim
+async function getZipcodeFromLocation(location) {
+  if (!location) return '';
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&addressdetails=1&limit=1`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data && data.length > 0 && data[0].address && data[0].address.postcode) {
+      return data[0].address.postcode;
+    }
+  } catch (e) {
+    // ignore
+  }
+  return '';
+}
+
+// Helper: Get lat/lng from zipcode using Nominatim
+async function getLatLngFromZip(zipcode, country = 'India') {
+  if (!zipcode) return { lat: null, lon: null };
+  let url = `https://nominatim.openstreetmap.org/search?postalcode=${zipcode}&country=${country}&format=json&limit=1`;
+  try {
+    let res = await fetch(url);
+    let data = await res.json();
+    if (data && data.length > 0) {
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+    // Fallback to US if India fails
+    if (country === 'India') {
+      url = `https://nominatim.openstreetmap.org/search?postalcode=${zipcode}&country=United States&format=json&limit=1`;
+      res = await fetch(url);
+      data = await res.json();
+      if (data && data.length > 0) {
+        return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+      }
+    }
+  } catch (e) {}
+  return { lat: null, lon: null };
+}
+
 const AdminDashboard = () => {
   const [items, setItems] = useState({
     restaurants: [],
@@ -57,6 +96,8 @@ const AdminDashboard = () => {
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const locationInputRef = useRef();
   let locationDebounceTimeout = useRef();
+  const [autoZipLoading, setAutoZipLoading] = useState(false);
+  const [autoZipError, setAutoZipError] = useState('');
   ReactModal.setAppElement('#root');
 
   // Fetch items from Supabase on mount
@@ -213,6 +254,8 @@ const AdminDashboard = () => {
         setParentLoading(false);
         return;
       }
+      // Geocode zipcode
+      const { lat, lon } = await getLatLngFromZip(parentForm.zipcode);
       const { error: insertError } = await supabase
         .from('admin_items')
         .insert([
@@ -222,6 +265,8 @@ const AdminDashboard = () => {
             location: parentForm.location,
             photo_url,
             zipcode: parseInt(parentForm.zipcode, 10),
+            latitude: lat,
+            longitude: lon,
           },
         ]);
       if (insertError) throw insertError;
@@ -243,7 +288,13 @@ const AdminDashboard = () => {
   // Edit parent handlers
   const startEditParent = (item) => {
     setEditingParentId(item.id);
-    setEditParentForm({ photo: item.photo_url, photoFile: null, name: item.name, location: item.location, zipcode: item.zipcode });
+    setEditParentForm({
+      photo: item.photo_url,
+      photoFile: null,
+      name: item.name,
+      location: item.location,
+      zipcode: item.zipcode ? String(item.zipcode) : '',
+    });
   };
   const cancelEditParent = () => {
     setEditingParentId(null);
@@ -277,12 +328,17 @@ const AdminDashboard = () => {
         const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
         photo_url = urlData.publicUrl;
       }
+      // Geocode zipcode
+      const { lat, lon } = await getLatLngFromZip(editParentForm.zipcode);
       const { error: updateError } = await supabase
         .from('admin_items')
         .update({
           name: editParentForm.name,
           location: editParentForm.location,
           photo_url,
+          zipcode: parseInt(editParentForm.zipcode, 10),
+          latitude: lat,
+          longitude: lon,
         })
         .eq('id', item.id);
       if (updateError) throw updateError;
@@ -299,7 +355,9 @@ const AdminDashboard = () => {
   const handleDeleteParent = async (item) => {
     if (!window.confirm('Delete this item and all its dishes?')) return;
     try {
-      await supabase.from('admin_items').delete().eq('id', item.id);
+      // Only delete the parent; ON DELETE CASCADE will handle related dishes and reviews
+      const { error } = await supabase.from('admin_items').delete().eq('id', item.id);
+      if (error) throw error;
       // Refetch items
       const { data: allData } = await supabase.from('admin_items').select('*');
       const grouped = { restaurants: [], biryani: [], pickles: [], tiffins: [] };
@@ -308,7 +366,8 @@ const AdminDashboard = () => {
       // Remove dishes from local state
       setDishes(prev => { const copy = { ...prev }; delete copy[item.id]; return copy; });
     } catch (err) {
-      alert('Failed to delete parent item.');
+      alert('Failed to delete parent item: ' + (err.message || err));
+      console.error('Delete error:', err);
     }
   };
 
@@ -438,6 +497,21 @@ const AdminDashboard = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Add this handler for location blur
+  const handleLocationBlur = async (e) => {
+    const location = e.target.value;
+    setAutoZipError('');
+    if (!location) return;
+    setAutoZipLoading(true);
+    const zipcode = await getZipcodeFromLocation(location);
+    setAutoZipLoading(false);
+    if (zipcode) {
+      setParentForm(prev => ({ ...prev, zipcode }));
+    } else {
+      setAutoZipError('Could not auto-detect zipcode for this location.');
+    }
+  };
+
   return (
     <div className="admin-bg food-bg-animate">
       <div className="admin-dashboard-container">
@@ -525,6 +599,7 @@ const AdminDashboard = () => {
               name="location"
               value={parentForm.location}
               onChange={handleLocationInputChange}
+              onBlur={handleLocationBlur}
               autoComplete="off"
               required
               placeholder="Start typing a city, state, or country..."
@@ -556,6 +631,8 @@ const AdminDashboard = () => {
               </ul>
             )}
           </div>
+          {autoZipLoading && <div style={{ color: '#1a73e8', fontSize: '0.95rem', marginTop: 2 }}>Detecting zipcode...</div>}
+          {autoZipError && <div style={{ color: '#d73748', fontSize: '0.95rem', marginTop: 2 }}>{autoZipError}</div>}
           <div className="form-group">
             <label htmlFor="parent-zipcode">Zipcode</label>
             <input
